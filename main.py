@@ -1,6 +1,9 @@
 from tkinter import *
 import sqlite3
 from PIL import ImageTk, Image
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import numpy as np
 
 #connecting to database
 #try:
@@ -169,6 +172,52 @@ def home():
 
     home_window.mainloop()
 
+def view_bar(month_selected):
+    bar_query = '''SELECT category, ROUND(SUM(amount),2) 
+        FROM expenses 
+        WHERE strftime('%m', date)= ? 
+        GROUP BY category'''
+    cur.execute(bar_query,(month_selected,))
+
+    result = cur.fetchall()
+    Amounts = []
+    Categories = []
+    for i in result:
+        # Names.append(i[0])
+        Amounts.append(i[1])
+        Categories.append(i[0])
+
+    # Visualize Data
+    plt.bar(Categories, Amounts)
+    plt.xlabel("Categories")
+    plt.ylabel("Amount (₹)")
+    #plt.title("{}'s Expenses".format('March'))
+    plt.show()
+
+def view_pie(month_selected):
+    pie_query = '''SELECT category, ROUND(SUM(amount),2) 
+        FROM expenses 
+        WHERE strftime('%m', date)= ?  
+        GROUP BY category'''
+    cur.execute(pie_query, (month_selected,))
+    result = cur.fetchall()
+    Amounts = []
+    Categories = []
+    for i in result:
+        Categories.append(i[0])
+        Amounts.append(i[1])
+
+    # Visualize Data
+    y = np.array(Amounts)
+    my_labels = Categories
+    plt.pie(y, labels=my_labels)
+    plt.title("{}'s Expenses by Categories".format('March'))
+    plt.legend(title="Categories:")
+    plt.show()
+
+view_pie('03')
+"""
 if __name__ == "__main__":
     main()
+"""
 conn.close()
