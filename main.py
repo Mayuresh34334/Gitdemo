@@ -140,13 +140,17 @@ def main():
     
 def home(): 
     #on pressing 'add expense button':
-    def addExpense(username):
+    def addExpense():
         def add_database():
-            cur.execute("SELECT ID FROM USER WHERE UNAME = ?", (username,))
-            userid = cur.fetchone()[0]
+            cur.execute("""CREATE TABLE IF NOT EXISTS expenses(USERID INTEGER REFERENCES user(id), 
+                DATE DATE, 
+                AMOUNT REAL, 
+                CATEGORY TEXT,
+                MOP TEXT,
+                NOTE TEXT)""")
             
             # convert to sql format
-            date = datetime.datetime.strptime(cal.get_date(), "%d/%m/%y").strftime("%Y-%m-%d")
+            date = datetime.datetime.strptime(cal.get_date(), "%m/%d/%y").strftime("%Y-%m-%d")
             amt= amt_entry.get()
             cat = cat_text.get()
             mop = mop_text.get()
@@ -157,7 +161,7 @@ def home():
             cur.execute(exp_query, exp_tuple)
             row = cur.fetchone()
 
-            if(row!=[] and cat and mop and len(amt_entry.get())):
+            if(row!=[] and cat and mop and amt_entry.get().isdigit()):
                 l5 = Label(addexp_window, text="Added Successfully",bg = label_colour,font = (myfont, 12))
                 l5.pack(pady = 10)
             else:
@@ -174,7 +178,7 @@ def home():
 
         amt_text = DoubleVar()
         cat_text = StringVar()
-        cat_list = ["Pets", "Housing", "Travel", "Utilities", "Transport", "Food", "Medical", "Entertainment", "Miscellaneous"]
+        cat_list = ["Savings", "Insurance", "Travel", "Utilities", "Transport", "Food", "Medical", "Entertainment", "Miscellaneous"]
         cat_list.sort()
         cat_menu = OptionMenu(addexp_window,cat_text, *cat_list)
         cat_menu.configure(bg=button_colour)
@@ -210,22 +214,17 @@ def home():
         note_entry.pack()
         b.pack(pady = 10)
     
-    #on pressing 'view bar' button:
-        
-    def view_graph():
+    #on pressing 'view graphs' button: 
+    def viewGraph():
         def view_pie():
             month_selected = month_text.get()
             pie_query = '''SELECT category, ROUND(SUM(amount),2) 
                 FROM expenses 
-                WHERE strftime('%m', date)= ?  
-                GROUP BY userid, category'''
-            cur.execute(pie_query, (month_selected,))
-            result = cur.fetchall()
+                WHERE strftime('%m', date)= ?  AND userid = ?
+                GROUP BY category'''
+            cur.execute(pie_query, (month_selected, userid))
             Amounts = []
             Categories = []
-            for i in result:
-                Categories.append(i[0])
-                Amounts.append(i[1])
 
             # Visualize Data
             y = np.array(Amounts)
@@ -240,11 +239,14 @@ def home():
 
             bar_query = '''SELECT category, ROUND(SUM(amount),2) 
                 FROM expenses 
-                WHERE strftime('%m', date)= ? 
-                GROUP BY userid, category'''
-            cur.execute(bar_query,(month_selected,))
+                WHERE strftime('%m', date)= ? AND userid = ?
+                GROUP BY category'''
+            cur.execute(bar_query,(month_selected, userid))
 
             result = cur.fetchall()
+            for i in result:
+                print(i)
+
             Amounts = []
             Categories = []
             for i in result:
@@ -258,7 +260,7 @@ def home():
             plt.show()
 
         bar_window = Tk()
-        bar_window.title('Bar Graph')
+        bar_window.title('Graphs')
         bar_window.geometry("300x300")
         bar_window.configure(bg=label_colour)
 
@@ -268,7 +270,6 @@ def home():
         month_menu = OptionMenu(bar_window, month_text, *month_list)
         month_menu.configure(bg=button_colour)
         month_text.set("")
-        
          
         bar_button = Button(bar_window,text="Bar Graph",width=20, command=view_bar, bg = button_colour, font = (myfont, 12))
         pie_button = Button(bar_window,text="Pie Chart",width=20, command=view_pie, bg = button_colour, font = (myfont, 12))
@@ -277,31 +278,79 @@ def home():
         bar_button.pack(pady=15)
         pie_button.pack(pady=15)
 
-
-        
+    #on pressing 'set budget' button
+    def setBudget():
+        pass
     label_colour = "#e1ddd7"
     button_colour = "#f9f6f6"
 
+    def viewTable():
+        def showFig():
+            month_selected = month_text.get()
+            pie_query = '''SELECT * FROM expenses 
+                WHERE strftime('%m', date)= ?  AND userid = ?'''
+            cur.execute(pie_query, (month_selected, userid))
+            result = cur.fetchall()
+            Amounts = []
+            Categories = []
+            Dates = []
+            #(1, '2023-03-21', 3000.0, 'Travel', 'UPI', 'Petrol')
+            for i in result:
+                Dates.append(i[1])
+                Amounts.append(i[2])
+                Categories.append(i[3])
+
+            fig = go.Figure(data=[go.Table(header=dict(values=["Date", "Amount", "Category"]),
+                                        cells=dict(values=[Dates, Amounts, Categories]))])
+            #fig.update_layout(title_text=month_selected + "'s Expenses", title_x=0.5)
+            fig.show()
+
+        table_window = Tk()
+        table_window.title('Table')
+        table_window.geometry("300x300")
+        table_window.configure(bg=label_colour)
+
+        month_label = Label(table_window, text="Select month:", bg = label_colour, font = (myfont, 12))
+        month_text = StringVar()
+        month_list = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+        month_menu = OptionMenu(table_window, month_text, *month_list)
+        month_menu.configure(bg=button_colour)
+        month_text.set("")
+        month_label.pack(pady=15)
+        month_menu.pack()
+
+        b = Button(table_window, text="View",width=20, command= showFig, bg = button_colour, font = (myfont, 12))
+        b.pack(pady = 10)
+        
+
     #table creation
-    cur.execute('''CREATE TABLE IF NOT EXISTS expenses(SNO INTEGER PRIMARY KEY AUTOINCREMENT, 
-        USERID INTEGER REFERENCES user(id), 
+    cur.execute('''CREATE TABLE IF NOT EXISTS expenses(USERID INTEGER REFERENCES user(id), 
         DATE DATE, 
         AMOUNT REAL, 
         CATEGORY TEXT,
         MOP TEXT,
         NOTE TEXT)''')
 
+    #window creation
     home_window = Tk()
-    home_window.title('Registration')
+    home_window.title('Home')
     home_window.geometry("%dx%d" % (width, height))
     home_window.configure(bg=label_colour)
-    
-    button1 = Button(home_window,text="Add Expenses",width=20, command=lambda: addExpense(user), bg = button_colour, font = (myfont, 12))
-    button1.pack(padx=5, pady=15)
 
-    button2 = Button(home_window,text="View Graphs",width=20, command= view_graph, bg = button_colour, font = (myfont, 12))
-    button2.pack(padx=5, pady=15)
+    cur.execute("SELECT ID FROM USER WHERE UNAME = ?", (user,))
+    userid = cur.fetchone()[0]
 
+    button1 = Button(home_window,text="Add Expenses",width=20, command=addExpense, bg = button_colour, font = (myfont, 12))
+    button1.pack(pady=30)
+
+    button2 = Button(home_window,text="View Graphs",width=20, command= viewGraph, bg = button_colour, font = (myfont, 12))
+    button2.pack(pady=30)
+
+    button3 =  Button(home_window, text="Set budget",width=20, command= setBudget, bg = button_colour, font = (myfont, 12))
+    button3.pack(pady = 30)
+
+    button4 =  Button(home_window, text="View Expenses",width=20, command= viewTable, bg = button_colour, font = (myfont, 12))
+    button4.pack(pady = 30)
 
     home_window.mainloop()
 
