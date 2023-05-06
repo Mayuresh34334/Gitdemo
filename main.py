@@ -4,13 +4,16 @@ from PIL import ImageTk, Image
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import numpy as np
+from tkcalendar import Calendar
+import datetime
+
 
 #connecting to database
-#try:
-conn = sqlite3.connect('ExpenseTracker.db') #database path
-cur = conn.cursor()
-#except:
- #   print("Unable to connect to database")
+try:
+    conn = sqlite3.connect('ExpenseTracker.db') #database path
+    cur = conn.cursor()
+except:
+    print("Unable to connect to database")
 
 
 def main():
@@ -75,11 +78,9 @@ def main():
         login_tuple = (user, e2.get())
         cur.execute(login_query, login_tuple)
         row = cur.fetchall()
-        #print(row)
         if row!=[]:
             start_window.destroy()
-            home()
-            
+            home()  
         else:
             l3.config(text="Wrong email or password!")
     
@@ -138,13 +139,14 @@ def main():
     start_window.mainloop()
     
 def home(): 
-    
     #on pressing 'add expense button':
     def addExpense(username):
         def add_database():
             cur.execute("SELECT ID FROM USER WHERE UNAME = ?", (username,))
             userid = cur.fetchone()[0]
-            date=date_entry.get()
+            
+            # convert to sql format
+            date = datetime.datetime.strptime(cal.get_date(), "%d/%m/%y").strftime("%Y-%m-%d")
             amt= amt_entry.get()
             cat = cat_text.get()
             mop = mop_text.get()
@@ -152,39 +154,42 @@ def home():
             exp_query = '''INSERT INTO expenses(USERID, DATE, AMOUNT, CATEGORY, MOP, NOTE)
             VALUES(?,?,?,?,?,?)'''
             exp_tuple = (userid, date, amt, cat, mop, note)
-            if(cur.execute(exp_query, exp_tuple)):
+            cur.execute(exp_query, exp_tuple)
+            row = cur.fetchone()
+
+            if(row!=[] and cat and mop and len(amt_entry.get())):
                 l5 = Label(addexp_window, text="Added Successfully",bg = label_colour,font = (myfont, 12))
                 l5.pack(pady = 10)
             else:
-                l5 = Label(addexp_window, text="Enter correct values",bg = label_colour,font = (myfont, 12))
+                l5 = Label(addexp_window, text="Please enter all values",bg = label_colour,font = (myfont, 12))
                 l5.pack(pady = 5)
 
             conn.commit()
+            
 
         addexp_window = Tk()
         addexp_window.title('Add Expense')
-        addexp_window.geometry("400x500")
+        addexp_window.geometry("400x600")
         addexp_window.configure(bg=label_colour)
 
-        date_text = StringVar()
         amt_text = DoubleVar()
         cat_text = StringVar()
         cat_list = ["Pets", "Housing", "Travel", "Utilities", "Transport", "Food", "Medical", "Entertainment", "Miscellaneous"]
         cat_list.sort()
         cat_menu = OptionMenu(addexp_window,cat_text, *cat_list)
         cat_menu.configure(bg=button_colour)
-        cat_text.set("Select Category")
+        cat_text.set("")
 
         mop_text = StringVar()
         mop_list = ["Cash", "Card", "UPI"]
         mop_menu = OptionMenu(addexp_window,mop_text, *mop_list)
         mop_menu.configure(bg=button_colour)
-        mop_text.set("Select MOP")
+        mop_text.set("")
 
         note_text = StringVar()
-        blank = Label(addexp_window, bg = label_colour, height=3)
-        date_label = Label(addexp_window, text="Date (YYYY-MM-DD)", bg = label_colour, font = (myfont, 12))
-        date_entry = Entry(addexp_window, textvariable= date_text, font = (myfont, 12))
+        date_label = Label(addexp_window, text="Date", bg = label_colour, font = (myfont, 12))
+        cal = Calendar(addexp_window, selectmode = 'day')
+ 
         amt_label = Label(addexp_window, text="Amount",bg = label_colour,font = (myfont, 12))
         amt_entry = Entry(addexp_window, textvariable= amt_text, font = (myfont, 12))
         note_entry = Entry(addexp_window, textvariable= note_text, font = (myfont, 12))
@@ -193,9 +198,8 @@ def home():
         note_label = Label(addexp_window, text="Note",bg = label_colour,font = (myfont, 12))
         b = Button(addexp_window,text="Add", command=add_database, font = (myfont, 12),bg = button_colour)
 
-        blank.pack()
-        date_label.pack()
-        date_entry.pack()
+        date_label.pack(pady = 10)
+        cal.pack()
         amt_label.pack(pady = 10)
         amt_entry.pack()
         cat_label.pack(pady = 10)
@@ -206,7 +210,75 @@ def home():
         note_entry.pack()
         b.pack(pady = 10)
     
-    
+    #on pressing 'view bar' button:
+        
+    def view_graph():
+        def view_pie():
+            month_selected = month_text.get()
+            pie_query = '''SELECT category, ROUND(SUM(amount),2) 
+                FROM expenses 
+                WHERE strftime('%m', date)= ?  
+                GROUP BY userid, category'''
+            cur.execute(pie_query, (month_selected,))
+            result = cur.fetchall()
+            Amounts = []
+            Categories = []
+            for i in result:
+                Categories.append(i[0])
+                Amounts.append(i[1])
+
+            # Visualize Data
+            y = np.array(Amounts)
+            my_labels = Categories
+            plt.pie(y, labels=my_labels)
+            #plt.title("{}'s Expenses by Categories".format('March'))
+            plt.legend(title="Categories:")
+            plt.show()
+
+        def view_bar():
+            month_selected = month_text.get()
+
+            bar_query = '''SELECT category, ROUND(SUM(amount),2) 
+                FROM expenses 
+                WHERE strftime('%m', date)= ? 
+                GROUP BY userid, category'''
+            cur.execute(bar_query,(month_selected,))
+
+            result = cur.fetchall()
+            Amounts = []
+            Categories = []
+            for i in result:
+                Amounts.append(i[1])
+                Categories.append(i[0])
+            # Visualize Data
+            plt.bar(Categories, Amounts)
+            plt.xlabel("Categories")
+            plt.ylabel("Amount (₹)")
+            #plt.title("{}'s Expenses".format('March'))
+            plt.show()
+
+        bar_window = Tk()
+        bar_window.title('Bar Graph')
+        bar_window.geometry("300x300")
+        bar_window.configure(bg=label_colour)
+
+        month_label = Label(bar_window, text="Select month:", bg = label_colour, font = (myfont, 12))
+        month_text = StringVar()
+        month_list = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+        month_menu = OptionMenu(bar_window, month_text, *month_list)
+        month_menu.configure(bg=button_colour)
+        month_text.set("")
+        
+         
+        bar_button = Button(bar_window,text="Bar Graph",width=20, command=view_bar, bg = button_colour, font = (myfont, 12))
+        pie_button = Button(bar_window,text="Pie Chart",width=20, command=view_pie, bg = button_colour, font = (myfont, 12))
+        month_label.pack(pady=15)
+        month_menu.pack()
+        bar_button.pack(pady=15)
+        pie_button.pack(pady=15)
+
+
+        
     label_colour = "#e1ddd7"
     button_colour = "#f9f6f6"
 
@@ -224,55 +296,14 @@ def home():
     home_window.geometry("%dx%d" % (width, height))
     home_window.configure(bg=label_colour)
     
-    button2 = Button(home_window,text="Add Expenses",width=20, command=lambda: addExpense(user), bg = '#F3F8FF', font = (myfont, 12))
+    button1 = Button(home_window,text="Add Expenses",width=20, command=lambda: addExpense(user), bg = button_colour, font = (myfont, 12))
+    button1.pack(padx=5, pady=15)
+
+    button2 = Button(home_window,text="View Graphs",width=20, command= view_graph, bg = button_colour, font = (myfont, 12))
     button2.pack(padx=5, pady=15)
 
+
     home_window.mainloop()
-
-def view_bar(month_selected):
-    bar_query = '''SELECT category, ROUND(SUM(amount),2) 
-        FROM expenses 
-        WHERE strftime('%m', date)= ? 
-        GROUP BY userid, category'''
-    cur.execute(bar_query,(month_selected,))
-
-    result = cur.fetchall()
-    Amounts = []
-    Categories = []
-    for i in result:
-        # Names.append(i[0])
-        Amounts.append(i[1])
-        Categories.append(i[0])
-
-    # Visualize Data
-    plt.bar(Categories, Amounts)
-    plt.xlabel("Categories")
-    plt.ylabel("Amount (₹)")
-    #plt.title("{}'s Expenses".format('March'))
-    plt.show()
-
-def view_pie(month_selected):
-    pie_query = '''SELECT category, ROUND(SUM(amount),2) 
-        FROM expenses 
-        WHERE strftime('%m', date)= ?  
-        GROUP BY userid, category'''
-    cur.execute(pie_query, (month_selected,))
-    result = cur.fetchall()
-    Amounts = []
-    Categories = []
-    for i in result:
-        Categories.append(i[0])
-        Amounts.append(i[1])
-
-    # Visualize Data
-    y = np.array(Amounts)
-    my_labels = Categories
-    plt.pie(y, labels=my_labels)
-    plt.title("{}'s Expenses by Categories".format('March'))
-    plt.legend(title="Categories:")
-    plt.show()
-
-#view_bar('03')
 
 if __name__ == "__main__":
     main()
