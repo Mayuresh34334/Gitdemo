@@ -73,7 +73,7 @@ start_window.title("Log In")
 start_window.geometry("%dx%d" % (width, height))
 
 #insert image
-image = Image.open('D:\\New\\RPPOOP-Project\\main_wallpaper.png')
+image = Image.open('D:\\New\\RPPOOP-Project\\main_wallpaperq.png')
 my_img = image.resize((width, height))
 
 background_img = ImageTk.PhotoImage(my_img)
